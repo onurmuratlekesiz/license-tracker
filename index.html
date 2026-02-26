@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; connect-src https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net wss://*.firebaseio.com;">
+<title>LisansTakip — Envanter Sistemi</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bricolage+Grotesque:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBGDd-BPvTAbFculUUWCd8Gtgh03cYwzAg",
+  authDomain: "license-tracker-fb51b.firebaseapp.com",
+  projectId: "license-tracker-fb51b",
+  storageBucket: "license-tracker-fb51b.firebasestorage.app",
+  messagingSenderId: "284167863677",
+  appId: "1:284167863677:web:016c4633561354317c2014"
+};
+
+const app  = initializeApp(firebaseConfig);
+const db   = getFirestore(app);
+const auth = getAuth(app);
+
+onAuthStateChanged(auth, user => {
+  if (user) {
+    window._fbUser = user;
+    const chip = document.getElementById('userChip');
+    if (chip) chip.textContent = user.email;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display   = 'block';
+    if (window._appReady) window._appReady();
+  }
+});
+
+window._fb = { db, auth, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy, serverTimestamp, signInWithEmailAndPassword, signOut };
+window.dispatchEvent(new Event('firebaseReady'));
+</script>
+
+<style>
+/* ════════════════════════════
+   DESIGN TOKENS
+════════════════════════════ */
+[data-theme="light"] {
+  --bg:        #f2f0ec;
+  --bg2:       #e8e5df;
+  --surface:   #ffffff;
+  --surface2:  #f8f6f2;
+  --border:    #dedad2;
+  --text:      #18160f;
+  --text2:     #56524a;
+  --muted:     #9a9690;
+  --accent:    #c84b08;
+  --accent-bg: #fef0e8;
+  --accent-h:  #a83d06;
+  --blue:      #1760a8;
+  --blue-bg:   #e8f0fb;
+  --ok:        #187040;
+  --ok-bg:     #e6f5ee;
+  --warn:      #a86000;
+  --warn-bg:   #fef5e0;
+  --danger:    #b82828;
+  --danger-bg: #fdeaea;
+  --shadow:    0 2px 8px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.07);
+}
+
+[data-theme="dark"] {
+  --bg:        #0d1117;
+  --bg2:       #161b22;
+  --surface:   #1c2128;
+  --surface2:  #22272e;
+  --border:    #30363d;
+  --text:      #e6edf3;
+  --text2:     #8b949e;
+  --muted:     #6e7681;
+  --accent:    #58a6ff;
+  --accent-bg: #0d1f33;
+  --accent-h:  #79c0ff;
+  --blue:      #58a6ff;
+  --blue-bg:   #0d1f33;
+  --ok:        #3fb950;
+  --ok-bg:     #0a1f0e;
+  --warn:      #d29922;
+  --warn-bg:   #1f1700;
+  --danger:    #f85149;
+  --danger-bg: #2a0d0d;
+  --shadow:    0 2px 8px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.3);
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+  transition: background .3s, color .3s;
+}
+
+/* ── THEME TOGGLE ── */
+.toggle-wrap { display:flex; align-items:center; gap:.4rem; }
+.theme-icon  { font-size:.8rem; user-select:none; }
+.theme-toggle {
+  width:40px; height:22px; background:var(--border);
+  border-radius:11px; border:none; cursor:pointer;
+  position:relative; transition:background .3s; flex-shrink:0;
+}
+.theme-toggle::after {
+  content:''; position:absolute; top:3px; left:3px;
+  width:16px; height:16px; border-radius:50%;
+  background:var(--surface); transition:transform .3s; box-shadow:var(--shadow-sm);
+}
+[data-theme="dark"] .theme-toggle           { background:var(--accent); }
+[data-theme="dark"] .theme-toggle::after    { transform:translateX(18px); }
+
+/* ── INPUTS ── */
+label {
+  display:block; font-size:.7rem; font-weight:600;
+  color:var(--text2); margin-bottom:.3rem; letter-spacing:.01em;
+}
+.input-wrap { position:relative; }
+.input-prefix, .input-suffix {
+  position:absolute; top:50%; transform:translateY(-50%);
+  font-size:.82rem; color:var(--muted); pointer-events:none;
+  font-family:'DM Mono',monospace;
+}
+.input-prefix { left:.75rem; }
+.input-suffix { right:.75rem; }
+.has-prefix input { padding-left:1.8rem !important; }
+.has-suffix input { padding-right:2.4rem !important; }
+
+input, select, textarea {
+  width:100%; background:var(--bg2); border:1.5px solid var(--border);
+  color:var(--text); padding:.65rem .85rem;
+  font-family:'Bricolage Grotesque',sans-serif; font-size:.88rem;
+  border-radius:8px; outline:none; min-width:0;
+  transition:border-color .2s, box-shadow .2s, background .2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-bg); background:var(--surface);
+}
+input::placeholder, textarea::placeholder { color:var(--muted); }
+
+input[type="date"] {
+  cursor: pointer;
+  appearance: auto;
+  -webkit-appearance: auto;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: .6;
+}
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+.form-group { margin-bottom:.85rem; }
+.form-row   { display:grid; grid-template-columns:1fr 1fr; gap:.65rem; }
+
+/* ── BUTTONS ── */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:.4rem;
+  padding:.6rem 1.1rem; border-radius:8px; font-family:inherit;
+  font-size:.83rem; font-weight:700; cursor:pointer;
+  border:1.5px solid transparent; transition:all .15s;
+}
+.btn-accent        { background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn-accent:hover  { background:var(--accent-h); border-color:var(--accent-h); }
+.btn-accent:disabled { opacity:.55; cursor:not-allowed; }
+.btn-ghost         { background:transparent; border-color:var(--border); color:var(--text2); }
+.btn-ghost:hover   { border-color:var(--accent); color:var(--accent); }
+.btn-danger        { background:transparent; border-color:var(--danger); color:var(--danger); }
+.btn-danger:hover  { background:var(--danger); color:#fff; }
+.btn-full          { width:100%; padding:.72rem; font-size:.9rem; }
+.btn-sm            { padding:.32rem .8rem; font-size:.76rem; border-radius:6px; }
+
+/* ── LOGIN ── */
+#loginScreen {
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  padding:2rem; background:var(--bg);
+}
+.login-wrap {
+  display:grid; grid-template-columns:1fr 1fr;
+  max-width:880px; width:100%; border-radius:18px;
+  overflow:hidden; box-shadow:var(--shadow); border:1px solid var(--border);
+}
+.login-left {
+  background:var(--accent); padding:3rem;
+  display:flex; flex-direction:column; justify-content:space-between;
+  position:relative; overflow:hidden;
+}
+.login-left::before {
+  content:''; position:absolute; top:-50px; right:-50px;
+  width:180px; height:180px; border-radius:50%; background:rgba(255,255,255,.13);
+}
+.login-left::after {
+  content:''; position:absolute; bottom:-40px; left:-30px;
+  width:140px; height:140px; border-radius:50%; background:rgba(255,255,255,.08);
+}
+.ll-brand h1 { font-size:2.2rem; font-weight:800; color:#fff; line-height:1.05; margin-bottom:.5rem; }
+.ll-brand p  { color:rgba(255,255,255,.78); font-size:.88rem; line-height:1.5; }
+.ll-feats    { display:flex; flex-direction:column; gap:.65rem; position:relative; z-index:1; }
+.ll-feat     { display:flex; align-items:center; gap:.65rem; color:rgba(255,255,255,.9); font-size:.82rem; }
+.ll-dot      { width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.65); flex-shrink:0; }
+
+.login-right { background:var(--surface); padding:3rem; display:flex; flex-direction:column; justify-content:center; }
+.lr-head     { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:2rem; }
+.lr-title    { font-size:1.35rem; font-weight:800; }
+.lr-sub      { font-size:.72rem; color:var(--muted); font-family:'DM Mono',monospace; margin-top:.2rem; }
+.fb-chip {
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.28rem .7rem; background:var(--accent-bg);
+  border:1px solid var(--accent); border-radius:99px;
+  font-family:'DM Mono',monospace; font-size:.6rem; color:var(--accent); margin-bottom:1.5rem;
+}
+.login-btn {
+  width:100%; padding:.8rem; background:var(--accent); color:#fff;
+  border:none; border-radius:8px; font-family:inherit; font-size:.95rem;
+  font-weight:700; cursor:pointer; margin-top:.4rem; transition:opacity .2s, transform .2s;
+}
+.login-btn:hover    { opacity:.9; transform:translateY(-1px); }
+.login-btn:disabled { opacity:.6; transform:none; cursor:not-allowed; }
+.err-msg {
+  color:var(--danger); font-family:'DM Mono',monospace; font-size:.7rem;
+  margin-top:.75rem; padding:.65rem .9rem; background:var(--danger-bg);
+  border:1px solid var(--danger); border-radius:6px; display:none;
+}
+
+/* ── APP HEADER ── */
+#appScreen { display:none; }
+.header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 1.5rem; height:56px; background:var(--surface);
+  border-bottom:1px solid var(--border); position:sticky; top:0; z-index:200;
+  box-shadow:var(--shadow-sm);
+}
+.header-brand { font-size:1.05rem; font-weight:800; letter-spacing:-.02em; }
+.header-brand span { color:var(--accent); }
+.header-right { display:flex; align-items:center; gap:.65rem; }
+.user-chip {
+  font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted);
+  padding:.28rem .7rem; background:var(--surface2); border:1px solid var(--border);
+  border-radius:99px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+/* ── STATS ── */
+.stats-bar {
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:1rem; padding:1rem 1.5rem; background:var(--bg2); border-bottom:1px solid var(--border);
+}
+.stat-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:.9rem 1.1rem; display:flex; align-items:center; gap:.9rem;
+  box-shadow:var(--shadow-sm); transition:transform .15s;
+}
+.stat-card:hover { transform:translateY(-1px); }
+.stat-ico { width:38px; height:38px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+.stat-ico.n  { background:var(--bg2); }
+.stat-ico.ok { background:var(--ok-bg); }
+.stat-ico.wa { background:var(--warn-bg); }
+.stat-ico.da { background:var(--danger-bg); }
+.stat-lbl { font-size:.66rem; color:var(--muted); font-weight:500; }
+.stat-val { font-size:1.6rem; font-weight:800; letter-spacing:-.03em; line-height:1.1; }
+.stat-val.ok { color:var(--ok); }
+.stat-val.wa { color:var(--warn); }
+.stat-val.da { color:var(--danger); }
+.stat-val.n  { color:var(--text); }
+
+/* ── ALERT BANNER ── */
+.alert-banner {
+  margin:1rem 1.5rem 0; padding:.85rem 1.1rem;
+  border:1px solid var(--warn); background:var(--warn-bg); border-radius:10px;
+  display:none; align-items:flex-start; gap:.75rem;
+}
+.alert-banner.show { display:flex; }
+.ab-icon  { font-size:1rem; flex-shrink:0; margin-top:2px; }
+.ab-title { font-weight:700; font-size:.8rem; color:var(--warn); margin-bottom:.25rem; }
+.ab-list  { font-family:'DM Mono',monospace; font-size:.63rem; color:var(--text2); list-style:none; }
+.ab-list li { padding:.08rem 0; }
+.ab-list li::before { content:'› '; color:var(--warn); }
+
+/* ── MAIN LAYOUT ── */
+.main { display:grid; grid-template-columns:290px 1fr; min-height:calc(100vh - 56px); }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  background:var(--surface); border-right:1px solid var(--border);
+  overflow-y:auto; height:calc(100vh - 56px); position:sticky; top:56px;
+  padding:1.5rem;
+}
+.sidebar-title {
+  font-size:.68rem; font-weight:700; color:var(--muted);
+  letter-spacing:.1em; text-transform:uppercase;
+  margin-bottom:1.25rem; padding-bottom:.75rem; border-bottom:1px solid var(--border);
+}
+
+/* Cost preview */
+.cost-preview {
+  display:none; padding:.55rem .75rem;
+  background:var(--ok-bg); border:1px solid var(--ok); border-radius:6px;
+  font-size:.72rem; color:var(--ok); font-family:'DM Mono',monospace; margin-top:.25rem;
+}
+
+/* ── CONTENT ── */
+.content-area { padding:1.25rem 1.5rem; background:var(--bg); }
+
+.toolbar { display:flex; align-items:center; gap:.65rem; margin-bottom:1.1rem; flex-wrap:wrap; }
+.search-wrap { flex:1; min-width:180px; max-width:300px; position:relative; }
+.search-wrap input { padding-left:2.1rem; font-size:.83rem; }
+.search-ico { position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--muted); font-size:.8rem; pointer-events:none; }
+.filter-pills { display:flex; gap:.3rem; flex-wrap:wrap; }
+.filter-pill {
+  padding:.3rem .8rem; border-radius:99px; font-size:.72rem; font-weight:600;
+  cursor:pointer; border:1.5px solid var(--border); background:transparent; color:var(--text2);
+  transition:all .15s; font-family:inherit;
+}
+.filter-pill:hover  { border-color:var(--accent); color:var(--accent); }
+.filter-pill.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.toolbar-right { margin-left:auto; display:flex; align-items:center; gap:.5rem; }
+.loading-wrap  { display:none; align-items:center; gap:.4rem; font-family:'DM Mono',monospace; font-size:.68rem; color:var(--muted); }
+.spinner { width:13px; height:13px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; flex-shrink:0; }
+.cost-summary {
+  display:none; align-items:center; gap:.4rem;
+  font-family:'DM Mono',monospace; font-size:.7rem; color:var(--text2);
+  padding:.5rem .9rem; background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; white-space:nowrap;
+}
+.cost-summary strong { color:var(--accent); }
+
+/* ── TABLE ── */
+.table-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; overflow:hidden; box-shadow:var(--shadow-sm);
+}
+table { width:100%; border-collapse:collapse; }
+thead th {
+  padding:.65rem .9rem; text-align:left;
+  font-size:.63rem; font-weight:700; color:var(--muted);
+  letter-spacing:.07em; text-transform:uppercase;
+  background:var(--surface2); border-bottom:1px solid var(--border); white-space:nowrap;
+}
+tbody tr { border-bottom:1px solid var(--border); transition:background .12s; }
+tbody tr:last-child { border-bottom:none; }
+tbody tr:hover { background:var(--surface2); }
+tbody td { padding:.8rem .9rem; font-size:.84rem; vertical-align:middle; }
+
+/* ── BADGES ── */
+.badge {
+  display:inline-flex; align-items:center; gap:.25rem;
+  padding:.18rem .55rem; border-radius:99px;
+  font-size:.65rem; font-weight:700; border:1px solid transparent; white-space:nowrap;
+}
+.b-ok { color:var(--ok);    background:var(--ok-bg);     border-color:var(--ok);    }
+.b-wa { color:var(--warn);  background:var(--warn-bg);   border-color:var(--warn);  }
+.b-da { color:var(--danger);background:var(--danger-bg); border-color:var(--danger);}
+.b-bl { color:var(--blue);  background:var(--blue-bg);   border-color:var(--blue);  }
+
+.days-chip {
+  display:inline-block; font-family:'DM Mono',monospace;
+  font-size:.72rem; font-weight:500; padding:.14rem .48rem; border-radius:4px;
+}
+.days-chip.ok { color:var(--ok);    background:var(--ok-bg);   }
+.days-chip.wa { color:var(--warn);  background:var(--warn-bg); }
+.days-chip.da { color:var(--danger);background:var(--danger-bg);}
+
+.soft    { color:var(--text2); }
+.mono-sm { font-family:'DM Mono',monospace; font-size:.63rem; color:var(--muted); margin-top:2px; }
+
+.act-btn {
+  width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--border); background:transparent; color:var(--muted);
+  border-radius:6px; cursor:pointer; font-size:.76rem; transition:all .14s;
+}
+.act-btn:hover     { border-color:var(--accent); color:var(--accent); background:var(--accent-bg); }
+.act-btn.del:hover { border-color:var(--danger); color:var(--danger); background:var(--danger-bg); }
+.actions { display:flex; gap:.35rem; }
+
+.empty-state { text-align:center; padding:4rem 2rem; color:var(--muted); }
+.empty-ico   { font-size:2.5rem; margin-bottom:.7rem; }
+.empty-title { font-size:.95rem; font-weight:700; color:var(--text2); margin-bottom:.3rem; }
+.empty-sub   { font-family:'DM Mono',monospace; font-size:.68rem; }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.55);
+  backdrop-filter:blur(3px); z-index:500;
+  display:none; align-items:center; justify-content:center; padding:1rem;
+}
+.modal-overlay.open { display:flex; }
+.modal {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; width:100%; max-width:500px;
+  padding:2rem; box-shadow:var(--shadow); max-height:90vh; overflow-y:auto;
+}
+.modal-title { font-size:1.05rem; font-weight:800; margin-bottom:1.35rem; }
+.modal-grid  { display:grid; grid-template-columns:1fr 1fr; gap:.7rem; }
+.modal-grid .full { grid-column:1/-1; }
+.modal-actions { display:flex; gap:.65rem; margin-top:1.35rem; justify-content:flex-end; }
+
+/* Security notice */
+.sec-notice {
+  margin:0 1.5rem 1rem; padding:.7rem 1rem;
+  background:var(--blue-bg); border:1px solid var(--blue); border-radius:8px;
+  font-size:.72rem; color:var(--blue); display:none; align-items:flex-start; gap:.5rem;
+}
+.sec-notice.show { display:flex; }
+
+@keyframes spin { to { transform:rotate(360deg); } }
+@keyframes slideIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+tbody tr { animation:slideIn .2s ease; }
+
+/* ── RESPONSIVE ── */
+@media (max-width:900px) {
+  .login-wrap { grid-template-columns:1fr; }
+  .login-left { display:none; }
+  .main { grid-template-columns:1fr; }
+  .sidebar { height:auto; position:static; border-right:none; border-bottom:1px solid var(--border); }
+  .stats-bar { grid-template-columns:1fr 1fr; }
+}
+@media (max-width:600px) {
+  .stats-bar { grid-template-columns:1fr 1fr; padding:.75rem; gap:.6rem; }
+  .content-area { padding:1rem; }
+  .header { padding:0 1rem; }
+  .sidebar { padding:1rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════ LOGIN ══════ -->
+<div id="loginScreen">
+  <div class="login-wrap">
+    <div class="login-left">
+      <div class="ll-brand">
+        <h1>Lisans<br>Takip</h1>
+        <p>Yazılım lisanslarınızı tek yerden yönetin, bitiş tarihlerini asla kaçırmayın.</p>
+      </div>
+      <div class="ll-feats">
+        <div class="ll-feat"><div class="ll-dot"></div>Firebase Firestore gerçek zamanlı veri</div>
+        <div class="ll-feat"><div class="ll-dot"></div>Bitiş tarihi uyarı sistemi</div>
+        <div class="ll-feat"><div class="ll-dot"></div>Toplam maliyet analizi</div>
+        <div class="ll-feat"><div class="ll-dot"></div>CSV export</div>
+      </div>
+    </div>
+    <div class="login-right">
+      <div class="lr-head">
+        <div>
+          <div class="lr-title">Giriş Yap</div>
+          <div class="lr-sub">license-tracker-fb51b</div>
+        </div>
+        <div class="toggle-wrap">
+          <span class="theme-icon" id="themeIcon">☀️</span>
+          <button class="theme-toggle" id="themeToggle"></button>
+        </div>
+      </div>
+      <div class="fb-chip">🔥 Firebase bağlantısı yapılandırıldı</div>
+      <div class="form-group">
+        <label>E-Posta</label>
+        <input type="email" id="loginEmail" placeholder="admin@sirket.com" autocomplete="email" autofocus>
+      </div>
+      <div class="form-group">
+        <label>Şifre</label>
+        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="login-btn" id="loginBtn"><span id="loginBtnTxt">Giriş Yap →</span></button>
+      <div class="err-msg" id="loginError"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ APP ══════ -->
+<div id="appScreen">
+
+  <div class="header">
+    <div class="header-brand">Lisans<span>Takip</span></div>
+    <div class="header-right">
+      <div class="user-chip" id="userChip">—</div>
+      <div class="toggle-wrap">
+        <span class="theme-icon" id="appThemeIcon">☀️</span>
+        <button class="theme-toggle" id="appThemeToggle"></button>
+      </div>
+      <button class="btn btn-sm btn-danger" id="logoutBtn">Çıkış</button>
+    </div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-ico n">📋</div>
+      <div><div class="stat-lbl">Toplam Lisans</div><div class="stat-val n" id="statTotal">0</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-ico ok">✓</div>
+      <div><div class="stat-lbl">Aktif</div><div class="stat-val ok" id="statActive">0</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-ico wa">⚠</div>
+      <div><div class="stat-lbl">Yakında Bitiyor</div><div class="stat-val wa" id="statExpiring">0</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-ico da">✕</div>
+      <div><div class="stat-lbl">Süresi Dolmuş</div><div class="stat-val da" id="statExpired">0</div></div>
+    </div>
+  </div>
+
+  <div class="sec-notice" id="secNotice">
+    <span>🔒</span>
+    <span>Firestore kurallarınızı test mode'dan production'a alın. &nbsp;<a href="https://console.firebase.google.com/project/license-tracker-fb51b/firestore/rules" target="_blank" rel="noopener" style="color:var(--blue);font-weight:700;">Kuralları düzenle →</a></span>
+  </div>
+
+  <div class="alert-banner" id="alertBanner">
+    <div class="ab-icon">🔔</div>
+    <div>
+      <div class="ab-title">Dikkat! Süresi yaklaşan veya dolmuş lisanslar:</div>
+      <ul class="ab-list" id="alertList"></ul>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ══ SIDEBAR — düz form, accordion yok ══ -->
+    <div class="sidebar">
+      <div class="sidebar-title">＋ Yeni Lisans Ekle</div>
+
+      <div class="form-group">
+        <label>Yazılım / Ürün Adı <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="f_name" placeholder="Microsoft Office 365" maxlength="120">
+      </div>
+      <div class="form-group">
+        <label>Tedarikçi</label>
+        <input type="text" id="f_vendor" placeholder="Microsoft" maxlength="80">
+      </div>
+      <div class="form-group">
+        <label>Kategori</label>
+        <select id="f_category">
+          <option value="">— Seçin —</option>
+          <option>İşletim Sistemi</option>
+          <option>Ofis &amp; Verimlilik</option>
+          <option>Güvenlik</option>
+          <option>Geliştirme Araçları</option>
+          <option>Tasarım</option>
+          <option>ERP / CRM</option>
+          <option>Bulut &amp; Altyapı</option>
+          <option>Diğer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Başlangıç</label>
+        <input type="date" id="f_startDate">
+      </div>
+      <div class="form-group">
+        <label>Bitiş <span style="color:var(--danger)">*</span></label>
+        <input type="date" id="f_endDate">
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Lisans Adedi</label>
+          <input type="number" id="f_count" placeholder="1" min="1" max="99999">
+        </div>
+        <div>
+          <label>Uyarı Eşiği</label>
+          <div class="input-wrap has-suffix">
+            <input type="number" id="f_warnDays" value="30" min="1" max="365">
+            <span class="input-suffix">gün</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Birim Maliyet</label>
+        <div class="input-wrap has-prefix">
+          <span class="input-prefix">₺</span>
+          <input type="number" id="f_cost" placeholder="0.00" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Para Birimi</label>
+        <select id="f_currency">
+          <option value="TRY">₺ Türk Lirası</option>
+          <option value="USD">$ Dolar</option>
+          <option value="EUR">€ Euro</option>
+        </select>
+      </div>
+      <div class="cost-preview" id="costPreview"></div>
+      <div class="form-group" style="margin-top:.85rem">
+        <label>Lisans Anahtarı</label>
+        <input type="text" id="f_licenseKey" placeholder="XXXXX-XXXXX-XXXXX" maxlength="120" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Atanan Kişi / Birim</label>
+        <input type="text" id="f_assignee" placeholder="IT Departmanı" maxlength="80">
+      </div>
+      <div class="form-group">
+        <label>Notlar</label>
+        <textarea id="f_notes" placeholder="Ek bilgi..." rows="2" maxlength="500" style="resize:vertical"></textarea>
+      </div>
+
+      <button class="btn btn-accent btn-full" id="addBtn">
+        <span id="addBtnTxt">💾 Lisansı Kaydet</span>
+      </button>
+    </div>
+
+    <!-- ══ CONTENT ══ -->
+    <div class="content-area">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="search-ico">🔍</span>
+          <input type="text" id="searchInput" placeholder="Ara...">
+        </div>
+        <div class="filter-pills">
+          <button class="filter-pill active" data-filter="all">Tümü</button>
+          <button class="filter-pill" data-filter="active">Aktif</button>
+          <button class="filter-pill" data-filter="expiring">Yakında</button>
+          <button class="filter-pill" data-filter="expired">Dolmuş</button>
+        </div>
+        <div class="toolbar-right">
+          <div class="cost-summary" id="costSummary">💰 Toplam: <strong id="totalCostVal">—</strong></div>
+          <button class="btn btn-sm btn-ghost" id="exportBtn">⬇ CSV</button>
+          <div class="loading-wrap" id="tableLoading"><div class="spinner"></div> Yükleniyor</div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Yazılım</th>
+              <th>Tedarikçi</th>
+              <th>Kategori</th>
+              <th>Adet</th>
+              <th>Bitiş</th>
+              <th>Kalan</th>
+              <th>Durum</th>
+              <th>Maliyet</th>
+              <th>Atanan</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="licenseTable">
+            <tr><td colspan="10">
+              <div class="empty-state">
+                <div class="empty-ico">📋</div>
+                <div class="empty-title">Henüz lisans yok</div>
+                <div class="empty-sub">Sol panelden yeni lisans ekleyin</div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EDIT MODAL ══ -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-title">✏️ Lisansı Düzenle</div>
+    <div class="modal-grid">
+      <div class="full"><label>Yazılım / Ürün Adı</label><input type="text" id="e_name" maxlength="120"></div>
+      <div class="full"><label>Tedarikçi</label><input type="text" id="e_vendor" maxlength="80"></div>
+      <div>
+        <label>Bitiş Tarihi</label>
+        <div class="date-wrap"><input type="date" id="e_endDate"></div>
+      </div>
+      <div><label>Lisans Adedi</label><input type="number" id="e_count" min="1"></div>
+      <div>
+        <label>Birim Maliyet</label>
+        <div class="input-wrap has-prefix">
+          <span class="input-prefix">₺</span>
+          <input type="number" id="e_cost" min="0" step="0.01">
+        </div>
+      </div>
+      <div>
+        <label>Uyarı Eşiği</label>
+        <div class="input-wrap has-suffix">
+          <input type="number" id="e_warnDays" min="1" max="365">
+          <span class="input-suffix">gün</span>
+        </div>
+      </div>
+      <div class="full"><label>Atanan Kişi / Birim</label><input type="text" id="e_assignee" maxlength="80"></div>
+      <div class="full"><label>Notlar</label><textarea id="e_notes" rows="2" maxlength="500" style="resize:vertical"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="closeEdit">İptal</button>
+      <button class="btn btn-accent" id="saveEdit">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+let licenses = [], filter = 'all', searchQ = '', editingId = null, FB = null;
+
+/* ── THEME ── */
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  const ic = t === 'dark' ? '🌙' : '☀️';
+  ['themeIcon','appThemeIcon'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ic; });
+  try { localStorage.setItem('lt_theme', t); } catch(_) {}
+}
+function toggleTheme() {
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+try { applyTheme(localStorage.getItem('lt_theme') || 'light'); } catch(_) { applyTheme('light'); }
+['themeToggle','appThemeToggle'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', toggleTheme);
+});
+
+/* ── COST PREVIEW ── */
+function updateCostPreview() {
+  const cost  = parseFloat(document.getElementById('f_cost').value)  || 0;
+  const count = parseInt(document.getElementById('f_count').value)   || 1;
+  const curr  = document.getElementById('f_currency').value || 'TRY';
+  const sym   = { TRY:'₺', USD:'$', EUR:'€' }[curr] || '₺';
+  const prev  = document.getElementById('costPreview');
+  if (cost > 0) {
+    const total = cost * count;
+    prev.style.display = 'block';
+    prev.textContent = `Toplam: ${sym}${total.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})} (${count} × ${sym}${cost.toLocaleString('tr-TR',{minimumFractionDigits:2})})`;
+  } else {
+    prev.style.display = 'none';
+  }
+}
+['f_cost','f_count','f_currency'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updateCostPreview);
+});
+
+/* ── FIREBASE ── */
+window.addEventListener('firebaseReady', () => {
+  FB = window._fb;
+  window._appReady = loadLicenses;
+  document.getElementById('loginBtn').addEventListener('click', doLogin);
+  document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('logoutBtn').addEventListener('click', doLogout);
+  if (window._fbUser) loadLicenses();
+});
+
+function txt(s)   { return document.createTextNode(String(s || '')); }
+function esc(s)   { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  const btn   = document.getElementById('loginBtn');
+  errEl.style.display = 'none';
+  if (!email || !pass) { errEl.textContent='E-posta ve şifre gerekli.'; errEl.style.display='block'; return; }
+
+  document.getElementById('loginBtnTxt').innerHTML =
+    '<span style="display:flex;align-items:center;justify-content:center;gap:.5rem"><span class="spinner"></span>Bağlanıyor...</span>';
+  btn.disabled = true;
+
+  try {
+    const cred = await FB.signInWithEmailAndPassword(FB.auth, email, pass);
+    document.getElementById('userChip').textContent = cred.user.email;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display   = 'block';
+    await loadLicenses();
+  } catch (err) {
+    const msgs = {
+      'auth/wrong-password':          'Şifre yanlış.',
+      'auth/invalid-credential':      'E-posta veya şifre hatalı.',
+      'auth/user-not-found':          'Kullanıcı bulunamadı.',
+      'auth/invalid-email':           'Geçersiz e-posta adresi.',
+      'auth/too-many-requests':       'Çok fazla deneme. Lütfen bekleyin.',
+      'auth/network-request-failed':  'Ağ hatası. İnternet bağlantınızı kontrol edin.',
+      'auth/configuration-not-found': 'Firebase Authentication etkin değil. Console → Authentication → Email/Password → Enable.',
+    };
+    errEl.textContent = msgs[err.code] || err.message;
+    errEl.style.display = 'block';
+  }
+  document.getElementById('loginBtnTxt').textContent = 'Giriş Yap →';
+  btn.disabled = false;
+}
+
+async function doLogout() {
+  try { await FB.signOut(FB.auth); } catch(_) {}
+  licenses = [];
+  document.getElementById('appScreen').style.display   = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPass').value  = '';
+}
+
+async function loadLicenses() {
+  const loader = document.getElementById('tableLoading');
+  loader.style.display = 'flex';
+  try {
+    let snap;
+    try { snap = await FB.getDocs(FB.query(FB.collection(FB.db,'licenses'), FB.orderBy('endDate','asc'))); }
+    catch { snap = await FB.getDocs(FB.collection(FB.db,'licenses')); }
+    licenses = snap.docs.map(d => {
+      const r = d.data();
+      return {
+        id: d.id,
+        name:       String(r.name       || ''),
+        vendor:     String(r.vendor     || ''),
+        category:   String(r.category   || ''),
+        count:      parseInt(r.count)   || 1,
+        cost:       parseFloat(r.cost)  || 0,
+        currency:   String(r.currency   || 'TRY'),
+        startDate:  String(r.startDate  || ''),
+        endDate:    String(r.endDate    || ''),
+        licenseKey: String(r.licenseKey || ''),
+        assignee:   String(r.assignee   || ''),
+        notes:      String(r.notes      || ''),
+        warnDays:   parseInt(r.warnDays)|| 30,
+      };
+    });
+    licenses.sort((a,b) => new Date(a.endDate)-new Date(b.endDate));
+    renderTable(); updateStats(); renderAlerts(); renderCostSummary();
+    document.getElementById('secNotice').classList.add('show');
+  } catch(e) { console.error('[LisansTakip]', e); }
+  loader.style.display = 'none';
+}
+
+document.getElementById('addBtn').addEventListener('click', async () => {
+  const name    = document.getElementById('f_name').value.trim();
+  const endDate = document.getElementById('f_endDate').value;
+  if (!name)    { alert('⚠ Yazılım adı zorunlu!');    document.getElementById('f_name').focus();    return; }
+  if (!endDate) { alert('⚠ Bitiş tarihi zorunlu!');   document.getElementById('f_endDate').focus(); return; }
+
+  const data = {
+    name,  endDate,
+    vendor:     document.getElementById('f_vendor').value.trim().slice(0,80),
+    category:   document.getElementById('f_category').value,
+    count:      Math.max(1, parseInt(document.getElementById('f_count').value) || 1),
+    cost:       Math.max(0, parseFloat(document.getElementById('f_cost').value) || 0),
+    currency:   document.getElementById('f_currency').value || 'TRY',
+    startDate:  document.getElementById('f_startDate').value,
+    licenseKey: document.getElementById('f_licenseKey').value.trim().slice(0,120),
+    assignee:   document.getElementById('f_assignee').value.trim().slice(0,80),
+    notes:      document.getElementById('f_notes').value.trim().slice(0,500),
+    warnDays:   Math.min(365, Math.max(1, parseInt(document.getElementById('f_warnDays').value) || 30)),
+    createdAt:  FB.serverTimestamp(),
+  };
+
+  const btn = document.getElementById('addBtn');
+  document.getElementById('addBtnTxt').innerHTML = '<span class="spinner" style="display:inline-block"></span> Kaydediliyor...';
+  btn.disabled = true;
+
+  try {
+    await FB.addDoc(FB.collection(FB.db,'licenses'), data);
+    ['f_name','f_vendor','f_licenseKey','f_assignee','f_notes'].forEach(id => document.getElementById(id).value='');
+    document.getElementById('f_category').value = '';
+    document.getElementById('f_count').value    = '';
+    document.getElementById('f_cost').value     = '';
+    document.getElementById('f_currency').value = 'TRY';
+    document.getElementById('f_startDate').value = '';
+    document.getElementById('f_endDate').value   = '';
+    document.getElementById('f_warnDays').value  = '30';
+    document.getElementById('costPreview').style.display = 'none';
+    await loadLicenses();
+  } catch(e) { alert('Kayıt hatası: '+e.message); }
+
+  document.getElementById('addBtnTxt').textContent = '💾 Lisansı Kaydet';
+  btn.disabled = false;
+});
+
+/* ── Helpers ── */
+function getStatus(d, w) { return d<0?'expired':d<=w?'expiring':'active'; }
+function formatDate(d) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+  catch { return d; }
+}
+function formatCurrency(val, curr) {
+  const sym = { TRY:'₺', USD:'$', EUR:'€' }[curr] || '₺';
+  return sym + val.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+/* ── RENDER TABLE ── */
+function renderTable() {
+  const tbody = document.getElementById('licenseTable');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const q     = searchQ.toLowerCase();
+
+  const filtered = licenses.filter(l => {
+    const d  = Math.ceil((new Date(l.endDate)-today)/86400000);
+    if (filter !== 'all' && getStatus(d,l.warnDays) !== filter) return false;
+    if (q) return [l.name,l.vendor,l.category,l.assignee].some(x=>x.toLowerCase().includes(q));
+    return true;
+  });
+
+  tbody.innerHTML = '';
+
+  if (!filtered.length) {
+    const tr = tbody.insertRow(); const td = tr.insertCell(); td.colSpan=10;
+    td.innerHTML = '<div class="empty-state"><div class="empty-ico">🔍</div><div class="empty-title">Sonuç bulunamadı</div><div class="empty-sub">Filtre veya arama kriterini değiştirin</div></div>';
+    return;
+  }
+
+  filtered.forEach(l => {
+    const today2 = new Date(); today2.setHours(0,0,0,0);
+    const d   = Math.ceil((new Date(l.endDate)-today2)/86400000);
+    const st  = getStatus(d, l.warnDays);
+    const dc  = st==='expired'?'da':st==='expiring'?'wa':'ok';
+    const dt  = st==='expired'?`${Math.abs(d)}g doldu`:`${d}g kaldı`;
+    const totalCost = l.cost * l.count;
+
+    const tr  = tbody.insertRow();
+
+    // Yazılım
+    const td0 = tr.insertCell();
+    const nameDiv = document.createElement('div'); nameDiv.style.fontWeight='600'; nameDiv.appendChild(txt(l.name));
+    td0.appendChild(nameDiv);
+    if (l.licenseKey) { const k = document.createElement('div'); k.className='mono-sm'; k.appendChild(txt(l.licenseKey)); td0.appendChild(k); }
+
+    // Tedarikçi
+    const td1 = tr.insertCell(); td1.className='soft'; td1.appendChild(txt(l.vendor||'—'));
+
+    // Kategori
+    const td2 = tr.insertCell();
+    if (l.category) { const b=document.createElement('span'); b.className='badge b-bl'; b.appendChild(txt(l.category)); td2.appendChild(b); }
+    else { const s=document.createElement('span'); s.className='soft'; s.textContent='—'; td2.appendChild(s); }
+
+    // Adet
+    const td3 = tr.insertCell(); td3.style.cssText="font-family:'DM Mono',monospace;font-size:.82rem"; td3.appendChild(txt(l.count));
+
+    // Bitiş
+    const td4 = tr.insertCell(); td4.style.cssText="font-family:'DM Mono',monospace;font-size:.78rem"; td4.appendChild(txt(formatDate(l.endDate)));
+
+    // Kalan
+    const td5 = tr.insertCell(); const chip=document.createElement('span'); chip.className=`days-chip ${dc}`; chip.appendChild(txt(dt)); td5.appendChild(chip);
+
+    // Durum
+    const td6 = tr.insertCell(); const badge=document.createElement('span');
+    if (st==='expired')       { badge.className='badge b-da'; badge.textContent='✕ Dolmuş'; }
+    else if (st==='expiring') { badge.className='badge b-wa'; badge.textContent='⚠ Yakında'; }
+    else                      { badge.className='badge b-ok'; badge.textContent='✓ Aktif'; }
+    td6.appendChild(badge);
+
+    // Maliyet
+    const td7 = tr.insertCell(); td7.style.cssText="font-family:'DM Mono',monospace;font-size:.78rem";
+    td7.appendChild(txt(totalCost>0 ? formatCurrency(totalCost,l.currency) : '—'));
+
+    // Atanan
+    const td8 = tr.insertCell(); td8.className='soft'; td8.style.fontSize='.8rem'; td8.appendChild(txt(l.assignee||'—'));
+
+    // Actions
+    const td9 = tr.insertCell();
+    const acts = document.createElement('div'); acts.className='actions';
+    const editBtn = document.createElement('button'); editBtn.className='act-btn'; editBtn.title='Düzenle'; editBtn.textContent='✏️'; editBtn.addEventListener('click',()=>openEdit(l.id));
+    const delBtn  = document.createElement('button'); delBtn.className='act-btn del'; delBtn.title='Sil'; delBtn.textContent='🗑️'; delBtn.addEventListener('click',()=>deleteLicense(l.id,l.name));
+    acts.appendChild(editBtn); acts.appendChild(delBtn); td9.appendChild(acts);
+  });
+}
+
+function updateStats() {
+  const today=new Date(); today.setHours(0,0,0,0);
+  let a=0,e=0,x=0;
+  licenses.forEach(l=>{ const d=Math.ceil((new Date(l.endDate)-today)/86400000); const st=getStatus(d,l.warnDays); if(st==='active')a++;else if(st==='expiring')e++;else x++; });
+  document.getElementById('statTotal').textContent=licenses.length;
+  document.getElementById('statActive').textContent=a;
+  document.getElementById('statExpiring').textContent=e;
+  document.getElementById('statExpired').textContent=x;
+}
+
+function renderCostSummary() {
+  if (!licenses.length) { document.getElementById('costSummary').style.display='none'; return; }
+  const totals={};
+  licenses.forEach(l=>{ const c=l.currency||'TRY'; totals[c]=(totals[c]||0)+(l.cost*l.count); });
+  const parts=Object.entries(totals).filter(([,v])=>v>0).map(([c,v])=>formatCurrency(v,c)).join(' + ');
+  if (parts) { document.getElementById('totalCostVal').textContent=parts; document.getElementById('costSummary').style.display='flex'; }
+}
+
+function renderAlerts() {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const banner=document.getElementById('alertBanner'); const list=document.getElementById('alertList');
+  const urgent=licenses.filter(l=>getStatus(Math.ceil((new Date(l.endDate)-today)/86400000),l.warnDays)!=='active').sort((a,b)=>new Date(a.endDate)-new Date(b.endDate));
+  list.innerHTML='';
+  if (urgent.length) {
+    banner.classList.add('show');
+    urgent.forEach(l=>{ const d=Math.ceil((new Date(l.endDate)-today)/86400000); const li=document.createElement('li'); const s=document.createElement('strong'); s.appendChild(txt(l.name)); li.appendChild(s); li.appendChild(txt(' — '+(d<0?Math.abs(d)+' gün önce doldu':d+' gün kaldı ('+formatDate(l.endDate)+')'))); list.appendChild(li); });
+  } else { banner.classList.remove('show'); }
+}
+
+async function deleteLicense(id,name) {
+  if (!confirm(`"${name}" lisansını silmek istediğinize emin misiniz?\nBu işlem geri alınamaz.`)) return;
+  try { await FB.deleteDoc(FB.doc(FB.db,'licenses',id)); await loadLicenses(); }
+  catch(e) { alert('Silme hatası: '+e.message); }
+}
+
+function openEdit(id) {
+  const l=licenses.find(x=>x.id===id); if(!l) return;
+  editingId=id;
+  document.getElementById('e_name').value=l.name;
+  document.getElementById('e_vendor').value=l.vendor;
+  document.getElementById('e_endDate').value=l.endDate;
+  document.getElementById('e_count').value=l.count;
+  document.getElementById('e_cost').value=l.cost;
+  document.getElementById('e_warnDays').value=l.warnDays;
+  document.getElementById('e_assignee').value=l.assignee;
+  document.getElementById('e_notes').value=l.notes;
+  document.getElementById('editModal').classList.add('open');
+}
+
+document.getElementById('closeEdit').addEventListener('click',()=>document.getElementById('editModal').classList.remove('open'));
+document.getElementById('editModal').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.remove('open');});
+
+document.getElementById('saveEdit').addEventListener('click', async ()=>{
+  if (!editingId) return;
+  const updates={
+    name:     document.getElementById('e_name').value.trim().slice(0,120),
+    vendor:   document.getElementById('e_vendor').value.trim().slice(0,80),
+    endDate:  document.getElementById('e_endDate').value,
+    count:    Math.max(1,parseInt(document.getElementById('e_count').value)||1),
+    cost:     Math.max(0,parseFloat(document.getElementById('e_cost').value)||0),
+    warnDays: Math.min(365,Math.max(1,parseInt(document.getElementById('e_warnDays').value)||30)),
+    assignee: document.getElementById('e_assignee').value.trim().slice(0,80),
+    notes:    document.getElementById('e_notes').value.trim().slice(0,500),
+  };
+  try { await FB.updateDoc(FB.doc(FB.db,'licenses',editingId),updates); document.getElementById('editModal').classList.remove('open'); await loadLicenses(); }
+  catch(e) { alert('Güncelleme hatası: '+e.message); }
+});
+
+document.getElementById('searchInput').addEventListener('input',e=>{searchQ=e.target.value;renderTable();});
+document.querySelectorAll('.filter-pill').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('.filter-pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); filter=btn.dataset.filter; renderTable();
+}));
+
+document.getElementById('exportBtn').addEventListener('click',()=>{
+  if (!licenses.length) { alert('Dışa aktarılacak lisans yok.'); return; }
+  const headers=['Ad','Tedarikçi','Kategori','Adet','Başlangıç','Bitiş','Kalan Gün','Durum','Birim Maliyet','Toplam Maliyet','Para Birimi','Atanan','Lisans Anahtarı','Notlar'];
+  const today=new Date(); today.setHours(0,0,0,0);
+  const rows=licenses.map(l=>{ const d=Math.ceil((new Date(l.endDate)-today)/86400000); const st=getStatus(d,l.warnDays); const sTr={active:'Aktif',expiring:'Yakında Bitiyor',expired:'Süresi Dolmuş'}[st]; return [l.name,l.vendor,l.category,l.count,l.startDate,l.endDate,d,sTr,l.cost,l.cost*l.count,l.currency,l.assignee,l.licenseKey,l.notes].map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(','); });
+  const csv='\uFEFF'+headers.join(',')+'\n'+rows.join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`lisanstakip_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
+});
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.getElementById('editModal').classList.remove('open'); });
+</script>
+</body>
+</html>
